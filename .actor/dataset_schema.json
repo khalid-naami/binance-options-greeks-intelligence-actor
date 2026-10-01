@@ -1,0 +1,161 @@
+{
+    "actorSpecification": 1,
+    "name": "binance-options-greeks-dataset",
+    "title": "Binance Options Strike-by-Strike Greeks & OI/Volume Dataset",
+    "description": "Tabular records of Binance crypto options chains including strike prices, primary & higher-order Greeks, Open Interest, 24h Volume, and breakeven levels.",
+    "views": {
+        "overview": {
+            "title": "Binance Options Greeks & Volume Overview",
+            "description": "Live crypto options strike chain with Greeks and OI/Volume from Binance",
+            "transformation": {
+                "fields": [
+                    "currency",
+                    "underlyingPriceUsd",
+                    "expirationDate",
+                    "daysToExpiration",
+                    "strike",
+                    "callLastPriceUsd",
+                    "putLastPriceUsd",
+                    "callMarkIvPct",
+                    "putMarkIvPct",
+                    "callDelta",
+                    "putDelta",
+                    "gamma",
+                    "vega",
+                    "callTheta",
+                    "putTheta",
+                    "vanna",
+                    "charmCall",
+                    "speed",
+                    "vomma",
+                    "color",
+                    "callOpenInterest",
+                    "putOpenInterest",
+                    "netOpenInterest",
+                    "callVolume24h",
+                    "putVolume24h",
+                    "netVolume24h",
+                    "callBreakevenUsd",
+                    "putBreakevenUsd"
+                ]
+            },
+            "display": {
+                "component": "table",
+                "properties": {
+                    "currency": {
+                        "label": "Currency",
+                        "format": "text"
+                    },
+                    "underlyingPriceUsd": {
+                        "label": "Spot Price ($)",
+                        "format": "number"
+                    },
+                    "expirationDate": {
+                        "label": "Expiry",
+                        "format": "text"
+                    },
+                    "daysToExpiration": {
+                        "label": "DTE",
+                        "format": "number"
+                    },
+                    "strike": {
+                        "label": "Strike ($)",
+                        "format": "number"
+                    },
+                    "callLastPriceUsd": {
+                        "label": "Call Last ($)",
+                        "format": "number"
+                    },
+                    "putLastPriceUsd": {
+                        "label": "Put Last ($)",
+                        "format": "number"
+                    },
+                    "callMarkIvPct": {
+                        "label": "Call IV (%)",
+                        "format": "number"
+                    },
+                    "putMarkIvPct": {
+                        "label": "Put IV (%)",
+                        "format": "number"
+                    },
+                    "callDelta": {
+                        "label": "Call Delta",
+                        "format": "number"
+                    },
+                    "putDelta": {
+                        "label": "Put Delta",
+                        "format": "number"
+                    },
+                    "gamma": {
+                        "label": "Gamma",
+                        "format": "number"
+                    },
+                    "vega": {
+                        "label": "Vega",
+                        "format": "number"
+                    },
+                    "callTheta": {
+                        "label": "Call Theta",
+                        "format": "number"
+                    },
+                    "putTheta": {
+                        "label": "Put Theta",
+                        "format": "number"
+                    },
+                    "vanna": {
+                        "label": "Vanna",
+                        "format": "number"
+                    },
+                    "charmCall": {
+                        "label": "Charm",
+                        "format": "number"
+                    },
+                    "speed": {
+                        "label": "Speed",
+                        "format": "number"
+                    },
+                    "vomma": {
+                        "label": "Vomma",
+                        "format": "number"
+                    },
+                    "color": {
+                        "label": "Color",
+                        "format": "number"
+                    },
+                    "callOpenInterest": {
+                        "label": "Call OI",
+                        "format": "number"
+                    },
+                    "putOpenInterest": {
+                        "label": "Put OI",
+                        "format": "number"
+                    },
+                    "netOpenInterest": {
+                        "label": "Net OI",
+                        "format": "number"
+                    },
+                    "callVolume24h": {
+                        "label": "Call Vol",
+                        "format": "number"
+                    },
+                    "putVolume24h": {
+                        "label": "Put Vol",
+                        "format": "number"
+                    },
+                    "netVolume24h": {
+                        "label": "Net Vol",
+                        "format": "number"
+                    },
+                    "callBreakevenUsd": {
+                        "label": "Call BE ($)",
+                        "format": "number"
+                    },
+                    "putBreakevenUsd": {
+                        "label": "Put BE ($)",
+                        "format": "number"
+                    }
+                }
+            }
+        }
+    }
+}
