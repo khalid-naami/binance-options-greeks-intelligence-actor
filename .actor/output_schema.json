@@ -2,22 +2,18 @@
     "actorOutputSchemaVersion": 1,
     "title": "Binance Crypto Options Greeks, Candlesticks & Volume Output",
     "description": "Comprehensive report of Binance crypto assets including spot prices, Binance Klines OHLCV candlesticks, strike-by-strike primary and higher-order Greeks tables, and Open Interest & Volume distributions.",
-    "type": "object",
     "properties": {
-        "title": {
-            "type": "string"
-        },
-        "timestamp": {
-            "type": "string"
-        },
-        "currenciesAnalyzed": {
-            "type": "integer"
-        },
-        "totalOptionStrikes": {
-            "type": "integer"
-        },
         "results": {
-            "type": "array"
+            "type": "string",
+            "title": "Options Chains Dataset",
+            "description": "Strike-by-strike options records with Greeks and OI/Volume distributions",
+            "template": "{{links.apiDefaultDatasetUrl}}/items"
+        },
+        "overview": {
+            "type": "string",
+            "title": "Summary Payload",
+            "description": "JSON summary payload stored in Key-Value store",
+            "template": "{{links.apiDefaultKeyValueStoreUrl}}/records/OUTPUT"
         }
     }
 }
