@@ -1,0 +1,14 @@
+{
+    "actorSpecification": 1,
+    "name": "binance-options-greeks-intelligence-actor",
+    "title": "Binance Crypto Options Greeks, Candlesticks & OI/Volume Tables",
+    "description": "Direct official Binance Options EAPI data engine: Complete strike-by-strike Greeks tables (Delta, Gamma, Vega, Theta, Vanna, Charm, Speed, Vomma, Color), Open Interest & Volume distributions, and Binance Klines OHLCV candlesticks across BTC, ETH, SOL, BNB, DOGE, and XRP.",
+    "version": "1.0",
+    "meta": {
+        "templateId": "python-start"
+    },
+    "dockerfile": "../Dockerfile",
+    "input": "./input_schema.json",
+    "dataset": "./dataset_schema.json",
+    "output": "./output_schema.json"
+}
