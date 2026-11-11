@@ -2,14 +2,36 @@
 
 import logging
 import math
-from datetime import datetime, date, timezone
-from typing import Dict, List, Optional, Any, Tuple
-import numpy as np
+from datetime import datetime, timezone
+from typing import Dict, List, Any
 from scipy.stats import norm
 
 from src.binance_client import BinanceClient
 
 logger = logging.getLogger(__name__)
+
+
+def _to_float(val: Any, default: float = 0.0) -> float:
+    if val is None or val == "":
+        return default
+    try:
+        v = float(val)
+        return v if math.isfinite(v) else default
+    except (TypeError, ValueError):
+        return default
+
+
+def _first_positive(*vals: Any) -> float:
+    for v in vals:
+        f = _to_float(v, 0.0)
+        if f > 0.0:
+            return f
+    return 0.0
+
+
+def _has_value(mapping: Dict[str, Any], key: str) -> bool:
+    return isinstance(mapping, dict) and mapping.get(key) not in (None, "")
+
 
 class BinanceGreeksEngine:
     """Processes Binance live options chains into unified strike-level Greeks & OI/Volume records."""
@@ -20,25 +42,32 @@ class BinanceGreeksEngine:
     def process_currency_options(
         self,
         currency: str,
-        max_expirations: int = 4
+        max_expirations: int = 4,
+        include_oi: bool = True,
     ) -> Dict[str, Any]:
         """Process complete live options chains across active expirations for a Binance crypto asset."""
-        clean_curr = currency.upper().replace('-USD', '').replace('-USDT', '').replace('^', '').strip()
-        spot_price = self.client.get_spot_price(clean_curr)
+        clean_curr = BinanceClient._clean_currency(currency)
         raw_options = self.client.get_options_data(clean_curr)
+        spot_price = self.client.get_spot_price(clean_curr)
+        dec = 2 if spot_price >= 10 else 4
 
         if not raw_options:
             logger.warning(f"No active Binance options contracts found for {clean_curr}")
             return {
                 "currency": clean_curr,
-                "underlyingPriceUsd": spot_price,
+                "underlyingPriceUsd": round(spot_price, dec),
                 "expirationsCount": 0,
-                "chains": []
+                "chains": [],
+                "allRecords": [],
             }
 
-        # Group options by Expiration Date (Binance symbol date is YYMMDD e.g. 260626)
+        exchange_info = self.client.get_exchange_info()
+        now_utc = datetime.now(timezone.utc)
+
+        # Group options by Expiration Date (Binance symbol date is YYMMDD and contracts settle at 08:00 UTC)
         expirations_map: Dict[str, List[Dict[str, Any]]] = {}
-        today = date.today()
+        expiry_code_map: Dict[str, str] = {}
+        expiry_dt_map: Dict[str, datetime] = {}
 
         for opt in raw_options:
             sym = opt.get('symbol', '')
@@ -48,23 +77,33 @@ class BinanceGreeksEngine:
 
             _, date_str, strike_str, opt_type = match.groups()
             try:
-                exp_date_obj = datetime.strptime(date_str, "%y%m%d").date()
-                if exp_date_obj < today:
+                sym_meta = exchange_info.get(sym, {})
+                expiry_ms = sym_meta.get('expiryDate')
+                if expiry_ms:
+                    exp_dt_utc = datetime.fromtimestamp(float(expiry_ms) / 1000.0, tz=timezone.utc)
+                else:
+                    parsed_d = datetime.strptime(date_str, "%y%m%d")
+                    exp_dt_utc = datetime(parsed_d.year, parsed_d.month, parsed_d.day, 8, 0, 0, tzinfo=timezone.utc)
+
+                if exp_dt_utc < now_utc:
                     continue
-                exp_iso = exp_date_obj.strftime("%Y-%m-%d")
-            except ValueError:
+                exp_iso = exp_dt_utc.strftime("%Y-%m-%d")
+            except (ValueError, TypeError):
                 continue
 
             if exp_iso not in expirations_map:
                 expirations_map[exp_iso] = []
+                expiry_code_map[exp_iso] = date_str
+                expiry_dt_map[exp_iso] = exp_dt_utc
+
             expirations_map[exp_iso].append({
                 **opt,
                 "_strike": float(strike_str),
                 "_type": opt_type,
-                "_exp_date_obj": exp_date_obj
+                "_exp_dt_utc": exp_dt_utc,
             })
 
-        sorted_expirations = sorted(list(expirations_map.keys()))[:max_expirations]
+        sorted_expirations = sorted(expirations_map.keys())[:max_expirations]
         logger.info(f"Processing {len(sorted_expirations)} Binance expirations for {clean_curr}: {sorted_expirations}")
 
         chains_results = []
@@ -72,12 +111,14 @@ class BinanceGreeksEngine:
 
         for exp_str in sorted_expirations:
             opts_for_exp = expirations_map[exp_str]
-            exp_date_obj = opts_for_exp[0]["_exp_date_obj"]
-            days_to_exp = max((exp_date_obj - today).days, 0.25)
-            T = days_to_exp / 365.0
-            r = 0.045
-            sqrt_T = math.sqrt(max(T, 0.0001))
-            discount = math.exp(-r * T)
+            exp_dt_utc = expiry_dt_map[exp_str]
+            days_to_exp = round(max((exp_dt_utc - now_utc).total_seconds() / 86400.0, 0.01), 2)
+            T = max(days_to_exp / 365.0, 1e-6)
+            sqrt_T = math.sqrt(T)
+
+            # Real Open Interest per contract from /eapi/v1/openInterest (not ticker quote turnover `amount`)
+            exp_yymmdd = expiry_code_map[exp_str]
+            oi_map = self.client.get_open_interest(clean_curr, exp_yymmdd) if include_oi else {}
 
             # Map options by Strike
             calls_by_strike: Dict[float, Dict[str, Any]] = {}
@@ -90,7 +131,7 @@ class BinanceGreeksEngine:
                 else:
                     puts_by_strike[s] = opt
 
-            all_strikes = sorted(list(set(calls_by_strike.keys()) | set(puts_by_strike.keys())))
+            all_strikes = sorted(set(calls_by_strike.keys()) | set(puts_by_strike.keys()))
 
             tot_call_oi, tot_put_oi = 0.0, 0.0
             tot_call_vol, tot_put_vol = 0.0, 0.0
@@ -100,67 +141,92 @@ class BinanceGreeksEngine:
                 c_opt = calls_by_strike.get(strike, {})
                 p_opt = puts_by_strike.get(strike, {})
 
-                c_mark = c_opt.get('markOptions', {})
-                p_mark = p_opt.get('markOptions', {})
+                c_mark = c_opt.get('markOptions', {}) or {}
+                p_mark = p_opt.get('markOptions', {}) or {}
 
-                c_price = float(c_opt.get('lastPrice') or c_mark.get('markPrice') or 0.0)
-                p_price = float(p_opt.get('lastPrice') or p_mark.get('markPrice') or 0.0)
+                # Check positive > 0 because Binance sends string "0" when no recent trades occurred
+                c_price = _first_positive(c_opt.get('lastPrice'), c_mark.get('markPrice'))
+                p_price = _first_positive(p_opt.get('lastPrice'), p_mark.get('markPrice'))
 
-                c_iv = float(c_mark.get('markIV') or c_mark.get('askIV') or 0.0) * 100.0
-                p_iv = float(p_mark.get('markIV') or p_mark.get('askIV') or 0.0) * 100.0
+                c_iv = _first_positive(c_mark.get('markIV'), c_mark.get('askIV'), c_mark.get('bidIV')) * 100.0
+                p_iv = _first_positive(p_mark.get('markIV'), p_mark.get('askIV'), p_mark.get('bidIV')) * 100.0
                 avg_iv = (c_iv + p_iv) / 2.0 if (c_iv > 0 and p_iv > 0) else max(c_iv, p_iv, 50.0)
                 sigma = avg_iv / 100.0
 
-                c_oi = float(c_opt.get('amount') or c_opt.get('volume') or 0.0)
-                p_oi = float(p_opt.get('amount') or p_opt.get('volume') or 0.0)
-                c_vol = float(c_opt.get('volume') or 0.0)
-                p_vol = float(p_opt.get('volume') or 0.0)
+                c_sym = c_opt.get('symbol', '')
+                p_sym = p_opt.get('symbol', '')
+                c_oi = _to_float(oi_map.get(c_sym), 0.0) if include_oi else 0.0
+                p_oi = _to_float(oi_map.get(p_sym), 0.0) if include_oi else 0.0
+                c_vol = _to_float(c_opt.get('volume'), 0.0)
+                p_vol = _to_float(p_opt.get('volume'), 0.0)
 
                 tot_call_oi += c_oi
                 tot_put_oi += p_oi
                 tot_call_vol += c_vol
                 tot_put_vol += p_vol
 
-                # Delta from Binance or analytical Black-Scholes
-                c_delta = float(c_mark.get('delta') or 0.0)
-                p_delta = float(p_mark.get('delta') or 0.0)
-                gamma_val = float(c_mark.get('gamma') or p_mark.get('gamma') or 0.0)
-                vega_val = float(c_mark.get('vega') or p_mark.get('vega') or 0.0)
-                theta_c_val = float(c_mark.get('theta') or 0.0)
-                theta_p_val = float(p_mark.get('theta') or 0.0)
+                if _has_value(c_mark, 'riskFreeInterest'):
+                    r = _to_float(c_mark.get('riskFreeInterest'), 0.0)
+                elif _has_value(p_mark, 'riskFreeInterest'):
+                    r = _to_float(p_mark.get('riskFreeInterest'), 0.0)
+                else:
+                    r = 0.045
 
-                # Higher-Order Greeks computation
+                discount = math.exp(-r * T)
+
+                # Primary Greeks directly from Binance EAPI /mark where reported
+                has_c_delta = _has_value(c_mark, 'delta')
+                has_p_delta = _has_value(p_mark, 'delta')
+                c_delta = _to_float(c_mark.get('delta'), 0.0)
+                p_delta = _to_float(p_mark.get('delta'), 0.0)
+
+                gamma_val = (
+                    _to_float(c_mark.get('gamma'), 0.0)
+                    if _has_value(c_mark, 'gamma')
+                    else _to_float(p_mark.get('gamma'), 0.0)
+                )
+                vega_val = (
+                    _to_float(c_mark.get('vega'), 0.0)
+                    if _has_value(c_mark, 'vega')
+                    else _to_float(p_mark.get('vega'), 0.0)
+                )
+                theta_c_val = _to_float(c_mark.get('theta'), 0.0)
+                theta_p_val = _to_float(p_mark.get('theta'), 0.0)
+
+                # Higher-Order Greeks & Black-Scholes fallbacks
                 forward = spot_price * math.exp(r * T)
+                vanna, charm_call, speed, vomma, color = 0.0, 0.0, 0.0, 0.0, 0.0
                 try:
-                    if sigma > 0 and strike > 0 and forward > 0:
+                    if sigma > 0 and strike > 0 and forward > 0 and sqrt_T > 0:
                         d1 = (math.log(forward / strike) + (0.5 * sigma ** 2) * T) / (sigma * sqrt_T)
                         d2 = d1 - sigma * sqrt_T
-                        pdf_d1 = norm.pdf(d1)
-                        if gamma_val == 0.0:
+                        pdf_d1 = float(norm.pdf(d1))
+
+                        if not has_c_delta:
+                            c_delta = float(norm.cdf(d1))
+                        if not has_p_delta:
+                            p_delta = float(-norm.cdf(-d1))
+
+                        if gamma_val == 0.0 and not (_has_value(c_mark, 'gamma') or _has_value(p_mark, 'gamma')):
                             gamma_val = float((discount * pdf_d1) / (forward * sigma * sqrt_T))
-                        if vega_val == 0.0:
+                        if vega_val == 0.0 and not (_has_value(c_mark, 'vega') or _has_value(p_mark, 'vega')):
                             vega_val = float(forward * discount * pdf_d1 * sqrt_T / 100.0)
-                        if theta_c_val == 0.0:
-                            theta_c_val = float((-(forward * discount * pdf_d1 * sigma) / (2.0 * sqrt_T) - r * c_price) / 365.0)
-                        if theta_p_val == 0.0:
-                            theta_p_val = float((-(forward * discount * pdf_d1 * sigma) / (2.0 * sqrt_T) - r * p_price) / 365.0)
+                        if theta_c_val == 0.0 and not _has_value(c_mark, 'theta'):
+                            theta_c_val = float(
+                                (-(forward * discount * pdf_d1 * sigma) / (2.0 * sqrt_T) - r * strike * discount * float(norm.cdf(d2))) / 365.0
+                            )
+                        if theta_p_val == 0.0 and not _has_value(p_mark, 'theta'):
+                            theta_p_val = float(
+                                (-(forward * discount * pdf_d1 * sigma) / (2.0 * sqrt_T) + r * strike * discount * float(norm.cdf(-d2))) / 365.0
+                            )
 
                         vanna = float(-discount * pdf_d1 * (d2 / sigma))
                         charm_call = float(discount * pdf_d1 * ((r / (sigma * sqrt_T)) - (d2 / (2.0 * T))) + r * c_delta)
                         speed = float(-(gamma_val / forward) * ((d1 / (sigma * sqrt_T)) + 1.0))
                         vomma = float((vega_val * d1 * d2) / sigma)
                         color = float(-gamma_val * ((r / (sigma * sqrt_T)) + ((1.0 - d1 * d2) / (2.0 * T))))
-                    else:
-                        vanna, charm_call, speed, vomma, color = 0.0, 0.0, 0.0, 0.0, 0.0
                 except Exception:
                     vanna, charm_call, speed, vomma, color = 0.0, 0.0, 0.0, 0.0, 0.0
-
-                if c_delta == 0.0 and strike > 0 and sigma > 0:
-                    c_delta = float(norm.cdf(d1))
-                if p_delta == 0.0 and strike > 0 and sigma > 0:
-                    p_delta = float(-norm.cdf(-d1))
-
-                dec = 2 if spot_price > 10 else 4
 
                 record = {
                     "currency": clean_curr,
@@ -190,7 +256,7 @@ class BinanceGreeksEngine:
                     "putVolume24h": round(p_vol, 2),
                     "netVolume24h": round(c_vol - p_vol, 2),
                     "callBreakevenUsd": round(strike + c_price, dec),
-                    "putBreakevenUsd": round(max(strike - p_price, 0.0), dec)
+                    "putBreakevenUsd": round(max(strike - p_price, 0.0), dec),
                 }
                 chain_strike_records.append(record)
                 all_strike_records.append(record)
@@ -211,13 +277,13 @@ class BinanceGreeksEngine:
                 "putCallRatioOI": pcr_oi,
                 "putCallRatioVolume": pcr_vol,
                 "strikesCount": len(chain_strike_records),
-                "records": chain_strike_records
+                "records": chain_strike_records,
             })
 
         return {
             "currency": clean_curr,
-            "underlyingPriceUsd": round(spot_price, 2),
+            "underlyingPriceUsd": round(spot_price, dec),
             "expirationsCount": len(chains_results),
             "chains": chains_results,
-            "allRecords": all_strike_records
+            "allRecords": all_strike_records,
         }
