@@ -1,6 +1,5 @@
 {
     "actorSpecification": 1,
-    "name": "binance-options-greeks-dataset",
     "title": "Binance Options Strike-by-Strike Greeks & OI/Volume Dataset",
     "description": "Tabular records of Binance crypto options chains including strike prices, primary & higher-order Greeks, Open Interest, 24h Volume, and breakeven levels.",
     "views": {
