@@ -6,8 +6,9 @@
         "currencies": {
             "title": "Crypto Currencies",
             "type": "array",
-            "description": "List of cryptocurrencies to fetch from Binance Options (e.g., BTC, ETH, SOL, BNB, DOGE, XRP).",
+            "description": "List of cryptocurrencies to fetch from Binance Options (e.g., BTC, ETH, SOL, BNB, DOGE, XRP, XAU, XAG).",
             "default": ["BTC", "ETH", "SOL"],
+            "prefill": ["BTC", "ETH", "SOL"],
             "items": {
                 "type": "string"
             },
@@ -54,7 +55,19 @@
             "type": "boolean",
             "description": "Whether to output the full primary and higher-order Greeks dataset.",
             "default": true
+        },
+        "proxyConfiguration": {
+            "title": "Proxy Configuration",
+            "type": "object",
+            "description": "Apify Proxy settings. IMPORTANT: Binance Options EAPI (eapi.binance.com) returns HTTP 451 geo-blocks from US servers (including Apify AWS US-East). Enable Apify Proxy and choose a non-US country (e.g. Germany DE, Netherlands NL, Singapore SG, Japan JP) or Residential/Custom proxy; if left on automatic, non-US Apify proxy countries are tried automatically.",
+            "editor": "proxy",
+            "prefill": {
+                "useApifyProxy": true
+            },
+            "default": {
+                "useApifyProxy": true
+            }
         }
     },
-    "required": ["currencies"]
+    "required": []
 }
