@@ -1,7 +1,153 @@
 {
     "actorSpecification": 1,
-    "title": "Binance Options Strike-by-Strike Greeks & OI/Volume Dataset",
-    "description": "Tabular records of Binance crypto options chains including strike prices, primary & higher-order Greeks, Open Interest, 24h Volume, and breakeven levels.",
+    "fields": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "additionalProperties": true,
+        "required": [],
+        "properties": {
+            "currency": {
+                "type": "string",
+                "title": "Currency",
+                "nullable": true
+            },
+            "underlyingPriceUsd": {
+                "type": "number",
+                "title": "Spot Price ($)",
+                "nullable": true
+            },
+            "expirationDate": {
+                "type": "string",
+                "title": "Expiry",
+                "nullable": true
+            },
+            "daysToExpiration": {
+                "type": "number",
+                "title": "DTE",
+                "nullable": true
+            },
+            "strike": {
+                "type": "number",
+                "title": "Strike ($)",
+                "nullable": true
+            },
+            "callLastPriceUsd": {
+                "type": "number",
+                "title": "Call Last ($)",
+                "nullable": true
+            },
+            "putLastPriceUsd": {
+                "type": "number",
+                "title": "Put Last ($)",
+                "nullable": true
+            },
+            "callMarkIvPct": {
+                "type": "number",
+                "title": "Call IV (%)",
+                "nullable": true
+            },
+            "putMarkIvPct": {
+                "type": "number",
+                "title": "Put IV (%)",
+                "nullable": true
+            },
+            "callDelta": {
+                "type": "number",
+                "title": "Call Delta",
+                "nullable": true
+            },
+            "putDelta": {
+                "type": "number",
+                "title": "Put Delta",
+                "nullable": true
+            },
+            "gamma": {
+                "type": "number",
+                "title": "Gamma",
+                "nullable": true
+            },
+            "vega": {
+                "type": "number",
+                "title": "Vega",
+                "nullable": true
+            },
+            "callTheta": {
+                "type": "number",
+                "title": "Call Theta",
+                "nullable": true
+            },
+            "putTheta": {
+                "type": "number",
+                "title": "Put Theta",
+                "nullable": true
+            },
+            "vanna": {
+                "type": "number",
+                "title": "Vanna",
+                "nullable": true
+            },
+            "charmCall": {
+                "type": "number",
+                "title": "Charm",
+                "nullable": true
+            },
+            "speed": {
+                "type": "number",
+                "title": "Speed",
+                "nullable": true
+            },
+            "vomma": {
+                "type": "number",
+                "title": "Vomma",
+                "nullable": true
+            },
+            "color": {
+                "type": "number",
+                "title": "Color",
+                "nullable": true
+            },
+            "callOpenInterest": {
+                "type": "number",
+                "title": "Call OI",
+                "nullable": true
+            },
+            "putOpenInterest": {
+                "type": "number",
+                "title": "Put OI",
+                "nullable": true
+            },
+            "netOpenInterest": {
+                "type": "number",
+                "title": "Net OI",
+                "nullable": true
+            },
+            "callVolume24h": {
+                "type": "number",
+                "title": "Call Vol",
+                "nullable": true
+            },
+            "putVolume24h": {
+                "type": "number",
+                "title": "Put Vol",
+                "nullable": true
+            },
+            "netVolume24h": {
+                "type": "number",
+                "title": "Net Vol",
+                "nullable": true
+            },
+            "callBreakevenUsd": {
+                "type": "number",
+                "title": "Call BE ($)",
+                "nullable": true
+            },
+            "putBreakevenUsd": {
+                "type": "number",
+                "title": "Put BE ($)",
+                "nullable": true
+            }
+        }
+    },
     "views": {
         "overview": {
             "title": "Binance Options Greeks & Volume Overview",
