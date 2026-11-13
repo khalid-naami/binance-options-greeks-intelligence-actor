@@ -44,6 +44,7 @@ class BinanceGreeksEngine:
         currency: str,
         max_expirations: int = 4,
         include_oi: bool = True,
+        include_full_greeks: bool = True,
     ) -> Dict[str, Any]:
         """Process complete live options chains across active expirations for a Binance crypto asset."""
         clean_curr = BinanceClient._clean_currency(currency)
@@ -228,7 +229,7 @@ class BinanceGreeksEngine:
                 except Exception:
                     vanna, charm_call, speed, vomma, color = 0.0, 0.0, 0.0, 0.0, 0.0
 
-                record = {
+                record: Dict[str, Any] = {
                     "currency": clean_curr,
                     "underlyingPriceUsd": round(spot_price, dec),
                     "expirationDate": exp_str,
@@ -244,20 +245,26 @@ class BinanceGreeksEngine:
                     "vega": round(vega_val, 4),
                     "callTheta": round(theta_c_val, 4),
                     "putTheta": round(theta_p_val, 4),
-                    "vanna": round(vanna, 6),
-                    "charmCall": round(charm_call, 6),
-                    "speed": round(speed, 8),
-                    "vomma": round(vomma, 6),
-                    "color": round(color, 8),
-                    "callOpenInterest": round(c_oi, 2),
-                    "putOpenInterest": round(p_oi, 2),
-                    "netOpenInterest": round(c_oi - p_oi, 2),
-                    "callVolume24h": round(c_vol, 2),
-                    "putVolume24h": round(p_vol, 2),
-                    "netVolume24h": round(c_vol - p_vol, 2),
                     "callBreakevenUsd": round(strike + c_price, dec),
                     "putBreakevenUsd": round(max(strike - p_price, 0.0), dec),
                 }
+                if include_full_greeks:
+                    record.update({
+                        "vanna": round(vanna, 6),
+                        "charmCall": round(charm_call, 6),
+                        "speed": round(speed, 8),
+                        "vomma": round(vomma, 6),
+                        "color": round(color, 8),
+                    })
+                if include_oi:
+                    record.update({
+                        "callOpenInterest": round(c_oi, 2),
+                        "putOpenInterest": round(p_oi, 2),
+                        "netOpenInterest": round(c_oi - p_oi, 2),
+                        "callVolume24h": round(c_vol, 2),
+                        "putVolume24h": round(p_vol, 2),
+                        "netVolume24h": round(c_vol - p_vol, 2),
+                    })
                 chain_strike_records.append(record)
                 all_strike_records.append(record)
 
