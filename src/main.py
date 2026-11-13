@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import math
 import sys
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Tuple
@@ -111,6 +112,7 @@ async def main() -> None:
 
         include_candles = bool(actor_input.get("includeCandlesticks", True))
         include_oi = bool(actor_input.get("includeOiVolumeTable", True))
+        include_full_greeks = bool(actor_input.get("includeFullGreeksTable", True))
         proxy_input = actor_input.get("proxyConfiguration")
 
         logger.info("Starting Binance Crypto Options Greeks & Candlesticks Actor...")
@@ -147,6 +149,7 @@ async def main() -> None:
                     currency=currency,
                     max_expirations=max_expirations,
                     include_oi=include_oi,
+                    include_full_greeks=include_full_greeks,
                 )
                 all_records = processed_data.pop("allRecords", [])
                 dataset_records.extend(all_records)
@@ -170,8 +173,12 @@ async def main() -> None:
             })
 
         if dataset_records:
-            logger.info(f"Pushing {len(dataset_records)} strike options records to Apify dataset...")
-            await Actor.push_data(dataset_records)
+            sanitized_records = [
+                {k: v for k, v in rec.items() if v is not None and not (isinstance(v, float) and not math.isfinite(v))}
+                for rec in dataset_records
+            ]
+            logger.info(f"Pushing {len(sanitized_records)} strike options records to Apify dataset...")
+            await Actor.push_data(sanitized_records)
 
         if not eapi_ok:
             status_code = client.last_eapi_status
@@ -197,8 +204,7 @@ async def main() -> None:
             }
             await Actor.set_value("OUTPUT", output_payload)
             logger.error(reason_msg)
-            Actor.status_message = reason_msg[:250]
-            Actor.exit_code = 1
+            await Actor.fail(status_message=reason_msg[:250])
             return
 
         output_payload = {
@@ -211,6 +217,9 @@ async def main() -> None:
             "results": all_results,
         }
         await Actor.set_value("OUTPUT", output_payload)
+        if not dataset_records:
+            await Actor.fail(status_message="No Binance option strike records were extracted.")
+            return
 
         logger.info(
             f"Actor completed successfully! Processed {len(all_results)} Binance crypto assets "
