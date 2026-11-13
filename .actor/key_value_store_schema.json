@@ -1,0 +1,15 @@
+{
+    "actorKeyValueStoreSchemaVersion": 1,
+    "title": "Binance Options Greeks Key-Value Store",
+    "description": "Summary report for Binance Crypto Options Greeks, Candlesticks & OI/Volume Tables.",
+    "collections": {
+        "output": {
+            "title": "Binance Options Summary",
+            "description": "Comprehensive report of spot prices, Klines OHLCV candlesticks, and strike-level Greeks/OI chains.",
+            "key": "OUTPUT",
+            "contentTypes": [
+                "application/json"
+            ]
+        }
+    }
+}
